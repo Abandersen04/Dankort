@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Notable people in Denmark</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        // Opret kortet
+        var map = L.map('map').setView([56.2639, 9.5018], 7);  // Danmark centralt
+
+        // Tilføj OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Læs CSV-filen
+        Papa.parse("data.csv", {
+            download: true,
+            header: true,  // Brug den første række som header
+            complete: function(results) {
+                console.log("CSV indlæst:", results.data);
+
+                // Filtrér data, så vi kun bruger de rækker, der har både latitude og longitude
+                var validData = results.data.filter(function(person) {
+                    return person.latitude && person.longitude;
+                });
+
+                console.log("Filtreret data:", validData);
+
+                // Opret markører for gyldige data
+                validData.forEach(function(person) {
+                    var lat = parseFloat(person.latitude);
+                    var lng = parseFloat(person.longitude);
+                    console.log("Opretter markør for:", person.personLabel, lat, lng);
+
+                    var marker = L.marker([lat, lng]).addTo(map);
+                    marker.bindPopup("<strong>" + person.personLabel + "</strong><br>" + person.birthPlaceLabel);
+                });
+            },
+            error: function(error) {
+                console.log("Der opstod en fejl ved indlæsning af CSV:", error);
+            }
+        });
+    </script>
+</body>
+</html>
