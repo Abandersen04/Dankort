@@ -188,11 +188,13 @@
                 // Filter markørerne, når en kategori vælges
                 categoryFilter.addEventListener("change", function() {
                     var selectedCategory = categoryFilter.value;
+
+                    // Filtrér dataene baseret på den valgte kategori
                     var filteredData = selectedCategory ? allData.filter(function(person) {
                         return person.kategori === selectedCategory;
                     }) : allData;
 
-                    // Fjern eksisterende markører
+                    // Fjern alle markører fra kortet og tilføj kun dem, der passer til den valgte kategori
                     markers.clearLayers();
 
                     // Tilføj markører for den valgte kategori
@@ -215,6 +217,8 @@
                                          "Født: " + (person.birthDate || "Ikke angivet") + "<br>" +
                                          (person.deathDate && person.deathDate !== "NA" ? "Død: " + person.deathDate + "<br>" : "") +
                                          "<a href='" + person.person + "' target='_blank'>More Info</a>");
+                         
+                        // Tilføj markøren til markerClusterGroup, så den bliver en del af clusteret
                         markers.addLayer(marker);
                     });
                 });
