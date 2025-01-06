@@ -2,11 +2,14 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Notable people in Denmark</title>
+    <title>Dankort</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
     <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
     <style>
         body {
             margin: 0;
@@ -19,19 +22,42 @@
             bottom: 0;
             width: 100%;
         }
+
+        /* CSS for the text in the top-right corner */
+        #info-text {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
+    <!-- Text in the top-right corner -->
+    <div id="info-text">
+        Please note that the exact addresses are not precise; the locations are shown at the parish and area level only.
+    </div>
+
     <script>
-        // Opret kortet
+        // Opret kortet med fokus på Danmark
         var map = L.map('map').setView([56.2639, 9.5018], 7);  // Danmark centralt
 
         // Tilføj OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
+
+        // Opret cluster-gruppe med max zoom radius for at styre clusterstørrelsen
+        var markers = L.markerClusterGroup({
+            maxClusterRadius: 40  // Cluster bliver delt op ved tættere afstand end 40px på kortet
+        });
 
         // Læs CSV-filen
         Papa.parse("data.csv", {
@@ -47,15 +73,46 @@
 
                 console.log("Filtreret data:", validData);
 
-                // Opret markører for gyldige data
+                // Tæl forekomster af samme koordinater
+                var coordinateCount = {};
+                validData.forEach(function(person) {
+                    var lat = person.latitude;
+                    var lng = person.longitude;
+                    var coords = lat + "," + lng;
+                    coordinateCount[coords] = (coordinateCount[coords] || 0) + 1;
+                });
+
+                // Opret markører og tilføj dem til cluster-gruppen
                 validData.forEach(function(person) {
                     var lat = parseFloat(person.latitude);
                     var lng = parseFloat(person.longitude);
-                    console.log("Opretter markør for:", person.personLabel, lat, lng);
+                    var coords = lat + "," + lng;
 
-                    var marker = L.marker([lat, lng]).addTo(map);
-                    marker.bindPopup("<strong>" + person.personLabel + "</strong><br>" + person.birthPlaceLabel);
+                    // Forskyd koordinaterne en smule, afhængigt af antallet af personer på samme sted
+                    var jitterAmount = (coordinateCount[coords] > 50) ? 0.01 : 0.002; // Større forskydning ved over 50 personer
+
+                    var jitterLat = lat + (Math.random() * jitterAmount - jitterAmount / 2); // Forskydning i lat
+                    var jitterLng = lng + (Math.random() * jitterAmount - jitterAmount / 2); // Forskydning i lng
+
+                    // Opret en divIcon med personens navn
+                    var personNameIcon = L.divIcon({
+                        className: 'person-name',
+                        html: "<strong>" + person.personLabel + "</strong>",
+                        iconSize: [30, 30], // størrelse af ikon
+                        iconAnchor: [15, 15], // centrere ikonet
+                        popupAnchor: [0, -15] // juster popup position
+                    });
+
+                    var marker = L.marker([jitterLat, jitterLng], { icon: personNameIcon });
+
+                    marker.bindPopup("<strong>" + person.personLabel + "</strong><br>" + 
+                                     person.birthPlaceLabel + "<br>" +
+                                     "<a href='" + person.person + "' target='_blank'>More Info</a>");
+                    markers.addLayer(marker);
                 });
+
+                // Tilføj cluster-gruppen til kortet
+                map.addLayer(markers);
             },
             error: function(error) {
                 console.log("Der opstod en fejl ved indlæsning af CSV:", error);
