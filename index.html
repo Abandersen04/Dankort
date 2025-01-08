@@ -164,8 +164,13 @@
                 let jitterLat = lat;
                 let jitterLng = lng;
                 const jitterAmount = 0.035; // Justér jitter-størrelsen
-                jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
-                jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
+                
+                // Hvis der er mere end 10 personer på samme koordinat, anvend jitter-effekt
+                const coordinateKey = `${lat},${lng}`;
+                if (coordinateCounts[coordinateKey] > 10) {
+                    jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
+                    jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
+                }
 
                 // Opret markør med personens navn som HTML
                 var icon = L.divIcon({
