@@ -1,16 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="da">
 <head>
     <meta charset="utf-8">
-    <title>Dankort</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Dankort</title>
+
+    <!-- Links til nødvendige eksterne biblioteker -->
     <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
     <style>
+        /* Generelle stilarter */
         body {
             margin: 0;
             padding: 0;
@@ -23,7 +27,7 @@
             width: 100%;
         }
 
-        /* CSS for the text and filter in the top-right corner */
+        /* Info-boks stil */
         #info-text {
             position: absolute;
             top: 10px;
@@ -34,11 +38,11 @@
             font-size: 14px;
             color: #333;
             z-index: 1000;
-            max-width: 250px; /* Limiterer bredden på tekstboksen */
+            max-width: 250px;
         }
 
         #info-text p {
-            margin: 0 0 5px; /* Tilføj lidt afstand mellem linjerne */
+            margin: 0 0 5px;
         }
 
         #info-text p:first-child {
@@ -55,177 +59,184 @@
             text-decoration: underline;
         }
 
-        /* Styling for the filter dropdown inside the same container */
-        #category-filter {
+        /* Styling for dropdown og slider */
+        #category-filter, #year-slider, #search-input {
             width: 100%;
             padding: 5px;
             border-radius: 5px;
             font-size: 14px;
-            margin-top: 10px; /* Adds some space above the dropdown */
+            margin-top: 10px;
         }
+
+        #year-slider {
+            margin-top: 10px;
+        }
+
+        #category-filter {
+            margin-bottom: 20px;
+        }
+
     </style>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map"></div> <!-- Kortet -->
 
-    <!-- Text and filter inside the top-right corner -->
     <div id="info-text">
         <p>Dankort</p>
-        <p>Vær opmærksom på, at de præcise adresser ikke er helt nøjagtige; placeringerne vises kun på sogne- og områdeniveau.</p>
+        <p>Placeringerne vises kun på sogne- og områdeniveau.</p>
         <p>Data: <a href="https://www.wikidata.org/wiki/Wikidata:Main_Page" target="_blank">Wikidata</a></p>
 
-        <!-- Filter dropdown inside the same container -->
         <label for="category-filter">Vælg kategori:</label>
         <select id="category-filter">
-            <option value="">Alle</option> <!-- Default option for all categories -->
+            <option value="">Alle</option>
+            <!-- Kategorien vil blive fyldt dynamisk fra data -->
         </select>
+
+        <label for="year-slider">Født før:</label>
+        <input type="range" id="year-slider" min="500" max="2024" value="2024" step="1">
+        <span id="year-label">2024</span>
+
+        <!-- Søgefelt for live søgning -->
+        <label for="search-input"></label>
+        <input type="text" id="search-input" placeholder="Søg efter navn">
     </div>
 
     <script>
-        // Opret kortet med fokus på Danmark
-        var map = L.map('map').setView([56.2639, 9.5018], 7);  // Danmark centralt
-    
-        // Tilføj OpenStreetMap tile layer
+        // Initialiser kortet
+        var map = L.map('map').setView([56.2639, 9.5018], 7);  // Sætter kortets initiale visning
+
+        // Tile layer for OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-    
-        // Opret cluster-gruppe med max zoom radius for at styre clusterstørrelsen
-        var markers = L.markerClusterGroup({
-            maxClusterRadius: 40  // Cluster bliver delt op ved tættere afstand end 40px på kortet
-        });
-    
-        var allData = []; // To store all CSV data
 
-        // Læs CSV-filen
+        // Marker Cluster for effektiv håndtering af markører
+        var markers = L.markerClusterGroup({
+            maxClusterRadius: 32
+        });
+
+        var allData = []; // Her gemmes alle data, som læses fra CSV-filen
+
+        // Indlæs data fra CSV
         Papa.parse("data2.csv", {
             download: true,
-            header: true,  // Brug den første række som header
+            header: true,
             complete: function(results) {
-                console.log("CSV indlæst:", results.data);  // Udskriv hele CSV'en for fejlfinding
-    
-                // Filtrér data, så vi kun bruger de rækker, der har både latitude og longitude
-                var validData = results.data.filter(function(person) {
-                    return person.latitude && person.longitude;
-                });
+                var validData = results.data.filter(person => person.latitude && person.longitude); // Filtrering af data med gyldige koordinater
+                allData = validData; // Gem data
 
-                // Gem all data for senere brug
-                allData = validData;
-
-                console.log("Filtreret data:", validData);  // Udskriv filtrerede data for fejlfinding
-    
-                // Tæl forekomster af samme koordinater
-                var coordinateCount = {};
-                validData.forEach(function(person) {
-                    var lat = person.latitude;
-                    var lng = person.longitude;
-                    var coords = lat + "," + lng;
-                    coordinateCount[coords] = (coordinateCount[coords] || 0) + 1;
-                });
-    
-                // Opret markører og tilføj dem til cluster-gruppen
-                validData.forEach(function(person) {
-                    var lat = parseFloat(person.latitude);
-                    var lng = parseFloat(person.longitude);
-                    var coords = lat + "," + lng;
-    
-                    // Forskyd koordinaterne en smule, afhængigt af antallet af personer på samme sted
-                    var jitterAmount = (coordinateCount[coords] > 50) ? 0.01 : 0.002; // Større forskydning ved over 50 personer
-    
-                    var jitterLat = lat + (Math.random() * jitterAmount - jitterAmount / 2); // Forskydning i lat
-                    var jitterLng = lng + (Math.random() * jitterAmount - jitterAmount / 2); // Forskydning i lng
-    
-                    // Opret en divIcon med personens navn
-                    var personNameIcon = L.divIcon({
-                        className: 'person-name',
-                        html: "<strong>" + person.personLabel + "</strong>",
-                        iconSize: [30, 30], // størrelse af ikon
-                        iconAnchor: [15, 15], // centrere ikonet
-                        popupAnchor: [0, -15] // juster popup position
-                    });
-    
-                    var marker = L.marker([jitterLat, jitterLng], { icon: personNameIcon });
-    
-                    // Fejlfinding: Udskriv værdierne til at sikre, at vi får de rigtige data
-                    console.log("Person data:", person);  // Udskriv hver persons data
-    
-                    // Håndter professioner og datoer korrekt
-                    var allProfessions = person.allProfessions ? person.allProfessions : "Ikke angivet";
-                    var birthDate = person.birthDate ? person.birthDate : "Ikke angivet";
-                    var deathDate = person.deathDate ? person.deathDate : "Ikke angivet";
-    
-                    // Tilføj de nye oplysninger til pop-up'en
-                    marker.bindPopup("<strong>" + person.personLabel + "</strong><br>" + 
-                                     "Fødested: " + person.birthPlaceLabel + "<br>" +
-                                     "Profession: " + allProfessions + "<br>" +  // Professioner vises
-                                     "Født: " + birthDate + "<br>" +  // Fødselsdato vises
-                                     (deathDate && deathDate !== "NA" ? "Død: " + deathDate + "<br>" : "") +  // Dødsdato vises kun, hvis den ikke er "NA"
-                                     "<a href='" + person.person + "' target='_blank'>More Info</a>");
-                    markers.addLayer(marker);
-                });
-    
-                // Tilføj cluster-gruppen til kortet
-                map.addLayer(markers);
-
-                // Populér filter dropdown med kategorier
-                var categories = [];
-                allData.forEach(function(person) {
-                    if (person.kategori && categories.indexOf(person.kategori) === -1) {
-                        categories.push(person.kategori);
-                    }
-                });
-    
-                categories.sort();  // Sorter kategorier alfabetisk
-    
-                var categoryFilter = document.getElementById("category-filter");
-                categories.forEach(function(category) {
-                    var option = document.createElement("option");
-                    option.value = category;
-                    option.textContent = category;
-                    categoryFilter.appendChild(option);
-                });
-    
-                // Filter markørerne, når en kategori vælges
-                categoryFilter.addEventListener("change", function() {
-                    var selectedCategory = categoryFilter.value;
-
-                    // Filtrér dataene baseret på den valgte kategori
-                    var filteredData = selectedCategory ? allData.filter(function(person) {
-                        return person.kategori === selectedCategory;
-                    }) : allData;
-
-                    // Fjern alle markører fra kortet og tilføj kun dem, der passer til den valgte kategori
-                    markers.clearLayers();
-
-                    // Tilføj markører for den valgte kategori
-                    filteredData.forEach(function(person) {
-                        var lat = parseFloat(person.latitude);
-                        var lng = parseFloat(person.longitude);
-
-                        var personNameIcon = L.divIcon({
-                            className: 'person-name',
-                            html: "<strong>" + person.personLabel + "</strong>",
-                            iconSize: [30, 30],
-                            iconAnchor: [15, 15],
-                            popupAnchor: [0, -15]
-                        });
-
-                        var marker = L.marker([lat, lng], { icon: personNameIcon });
-                        marker.bindPopup("<strong>" + person.personLabel + "</strong><br>" +
-                                         "Fødested: " + person.birthPlaceLabel + "<br>" +
-                                         "Profession: " + (person.allProfessions || "Ikke angivet") + "<br>" +
-                                         "Født: " + (person.birthDate || "Ikke angivet") + "<br>" +
-                                         (person.deathDate && person.deathDate !== "NA" ? "Død: " + person.deathDate + "<br>" : "") +
-                                         "<a href='" + person.person + "' target='_blank'>More Info</a>");
-                         
-                        // Tilføj markøren til markerClusterGroup, så den bliver en del af clusteret
-                        markers.addLayer(marker);
-                    });
-                });
+                populateDropdown(validData); // Fyld dropdown-menuen med kategorier
+                addMarkers(validData); // Tilføj markører til kortet
             },
             error: function(error) {
-                console.log("Der opstod en fejl ved indlæsning af CSV:", error);
+                console.log("Fejl ved indlæsning af CSV:", error);
             }
+        });
+
+        // Fyld dropdown-menuen med kategorier
+        function populateDropdown(data) {
+            var categories = [...new Set(data.map(person => person.kategori))]; // Hent unikke kategorier
+            var categoryFilter = document.getElementById("category-filter");
+
+            categories.sort().forEach(category => {
+                var option = document.createElement("option");
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+
+        // Tilføj markører til kortet
+        function addMarkers(data) {
+            markers.clearLayers(); // Ryd eksisterende markører
+
+            const coordinateCounts = {}; // Tælling af personer pr. koordinat
+            data.forEach(person => {
+                const key = `${person.latitude},${person.longitude}`;
+                coordinateCounts[key] = (coordinateCounts[key] || 0) + 1;
+            });
+
+            data.forEach(person => {
+                var lat = parseFloat(person.latitude);
+                var lng = parseFloat(person.longitude);
+
+                // Jitter-effekt for markørernes placering
+                let jitterLat = lat;
+                let jitterLng = lng;
+                const jitterAmount = 0.035; // Justér jitter-størrelsen
+                jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
+                jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
+
+                // Opret markør med personens navn som HTML
+                var icon = L.divIcon({
+                    className: 'person-name',
+                    html: "<strong>" + person.personLabel + "</strong>",
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                    popupAnchor: [0, -15]
+                });
+
+                var marker = L.marker([jitterLat, jitterLng], { icon: icon });
+                marker.bindPopup(
+                    `<strong>${person.personLabel}</strong><br>` +
+                    `Fødested: ${person.birthPlaceLabel || 'Ikke angivet'}<br>` +
+                    `Profession: ${person.allProfessions || 'Ikke angivet'}<br>` +
+                    `Født: ${person.birthDate || 'Ikke angivet'}<br>` +
+                    (person.deathDate && person.deathDate !== 'NA' ? `Død: ${person.deathDate}<br>` : "") +
+                    `<a href='${person.wikilink}' target='_blank'>Wikipedia</a>`
+                );
+
+                markers.addLayer(marker); // Tilføj markøren til kortet
+            });
+
+            map.addLayer(markers); // Tilføj alle markører til kortet
+        }
+
+        // Håndter ændringer i dropdown-menuen (kategori-filter)
+        document.getElementById("category-filter").addEventListener("change", function() {
+            var selectedCategory = this.value;
+            var selectedYear = parseInt(document.getElementById("year-slider").value);
+            var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+
+            var filteredData = allData.filter(person => {
+                var personYear = parseInt(person.year);
+                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
+                return (selectedCategory ? person.kategori === selectedCategory : true) &&
+                    personYear <= selectedYear && matchesSearch;
+            });
+            addMarkers(filteredData);
+        });
+
+        // Håndter ændringer i slideren (årstal)
+        document.getElementById("year-slider").addEventListener("input", function() {
+            var selectedYear = this.value;
+            document.getElementById("year-label").textContent = selectedYear;
+
+            var selectedCategory = document.getElementById("category-filter").value;
+            var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+
+            var filteredData = allData.filter(person => {
+                var personYear = parseInt(person.year);
+                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
+                return (selectedCategory ? person.kategori === selectedCategory : true) &&
+                    personYear <= selectedYear && matchesSearch;
+            });
+            addMarkers(filteredData);
+        });
+
+        // Håndter live-søgning
+        document.getElementById("search-input").addEventListener("input", function() {
+            var selectedSearchTerm = this.value.toLowerCase();
+            var selectedYear = parseInt(document.getElementById("year-slider").value);
+            var selectedCategory = document.getElementById("category-filter").value;
+
+            var filteredData = allData.filter(person => {
+                var personYear = parseInt(person.year);
+                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
+                return (selectedCategory ? person.kategori === selectedCategory : true) &&
+                    personYear <= selectedYear && matchesSearch;
+            });
+            addMarkers(filteredData);
         });
     </script>
 </body>
