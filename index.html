@@ -60,23 +60,22 @@
         }
 
         /* Styling for dropdown og slider */
-        #category-filter, #year-slider, #search-input {
-            width: 100%;
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 14px;
-            margin-top: 10px;
-        }
+        #category-filter, #year-slider, #search-input, #born-before, #born-after {
+        width: 100%;
+        padding: 5px;
+        border-radius: 5px;
+        font-size: 14px;
+        margin-top: 10px;
+    }
 
-        #year-slider {
-            margin-top: 10px;
-        }
+    #year-slider {
+        margin-top: 10px;
+    }
 
-        #category-filter {
-            margin-bottom: 20px;
-        }
-
-    </style>
+    #category-filter {
+        margin-bottom: 20px;
+    }
+</style>
 </head>
 <body>
     <div id="map"></div> <!-- Kortet -->
@@ -89,6 +88,8 @@
         <label for="category-filter">Vælg kategori:</label>
         <select id="category-filter">
             <option value="">Alle</option>
+
+            
             <!-- Kategorien vil blive fyldt dynamisk fra data -->
         </select>
 
@@ -118,20 +119,35 @@
         var allData = []; // Her gemmes alle data, som læses fra CSV-filen
 
         // Indlæs data fra CSV
-        Papa.parse("data2.csv", {
-            download: true,
-            header: true,
-            complete: function(results) {
-                var validData = results.data.filter(person => person.latitude && person.longitude); // Filtrering af data med gyldige koordinater
-                allData = validData; // Gem data
-
-                populateDropdown(validData); // Fyld dropdown-menuen med kategorier
-                addMarkers(validData); // Tilføj markører til kortet
-            },
-            error: function(error) {
-                console.log("Fejl ved indlæsning af CSV:", error);
-            }
+        Papa.parse("data1.csv", {
+    download: true,
+    header: true,
+    complete: ({ data }) => {
+        // Filtrer kun de rækker, der har både valid latitude og longitude
+        const validData = data.filter(p => {
+            const lat = parseFloat(p.latitude);
+            const lon = parseFloat(p.longitude);
+            return !isNaN(lat) && !isNaN(lon);  // Kun gyldige numeriske værdier
         });
+
+        if (validData.length === 0) {
+            console.error("Der er ingen gyldige data med lat/long.");
+        } else {
+            allData = validData;
+            populateDropdown(validData);
+            addMarkers(validData);
+        }
+    },
+    error: e => console.error("Fejl ved indlæsning af CSV:", e)
+});
+
+
+
+
+
+
+
+
 
         // Fyld dropdown-menuen med kategorier
         function populateDropdown(data) {
@@ -165,12 +181,19 @@
                 let jitterLng = lng;
                 const jitterAmount = 0.035; // Justér jitter-størrelsen
                 
-                // Hvis der er mere end 10 personer på samme koordinat, anvend jitter-effekt
+                // Hvis der er mere end 10 personer på samme koordinat, anvend større jitter-effekt
                 const coordinateKey = `${lat},${lng}`;
+
                 if (coordinateCounts[coordinateKey] > 10) {
-                    jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
-                    jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
-                }
+                jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
+                jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
+                } else if (coordinateCounts[coordinateKey] > 1) {
+    
+                // Hvis der er mindre end 10 personer, anvend en lille jitter-effekt
+                const smallJitterAmount = 0.01; // Justér denne værdi for at lave en mindre jitter
+                jitterLat += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
+                jitterLng += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
+                 }
 
                 // Opret markør med personens navn som HTML
                 var icon = L.divIcon({
