@@ -32,7 +32,7 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background-color: rgba(255, 255, 255, 0.7);
+            background-color: rgba(255, 255, 255, 0.79);
             padding: 10px;
             border-radius: 5px;
             font-size: 14px;
@@ -59,23 +59,35 @@
             text-decoration: underline;
         }
 
-        /* Styling for dropdown og slider */
-        #category-filter, #year-slider, #search-input, #born-before, #born-after {
-        width: 100%;
-        padding: 5px;
-        border-radius: 5px;
-        font-size: 14px;
-        margin-top: 10px;
-    }
+        /* Styling for dropdown */
+        #category-filter, #search-input, #year-after, #year-before {
+            width: 100%;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
 
-    #year-slider {
-        margin-top: 10px;
-    }
+        input[type="range"] {
+            width: 100%;
+        }
 
-    #category-filter {
-        margin-bottom: 20px;
-    }
-</style>
+        #category-filter {
+            margin-bottom: 20px;
+        }
+
+    /* Fjern spinnerne fra number input */
+         input[type="number"]::-webkit-outer-spin-button,
+         input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+         }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+         }
+
+    </style>
 </head>
 <body>
     <div id="map"></div> <!-- Kortet -->
@@ -88,14 +100,19 @@
         <label for="category-filter">Vælg kategori:</label>
         <select id="category-filter">
             <option value="">Alle</option>
-
-            
-            <!-- Kategorien vil blive fyldt dynamisk fra data -->
         </select>
 
-        <label for="year-slider">Født før:</label>
-        <input type="range" id="year-slider" min="500" max="2024" value="2024" step="1">
-        <span id="year-label">2024</span>
+        <!-- Felter til at filtrere efter fødselsår -->
+        <div style="display: flex; justify-content: space-between; gap: 10px;">
+        <div style="flex: 1;">
+        <label for="born-after">Født efter:</label>
+        <input type="number" id="born-after" placeholder="Fødselsår" style="width: 100%; max-width: 150px;">
+        </div>
+        <div style="flex: 1;">
+        <label for="born-before">Født før:</label>
+        <input type="number" id="born-before" placeholder="Fødselsår" style="width: 100%; max-width: 150px;">
+        </div>
+    </div>
 
         <!-- Søgefelt for live søgning -->
         <label for="search-input"></label>
@@ -120,34 +137,25 @@
 
         // Indlæs data fra CSV
         Papa.parse("data1.csv", {
-    download: true,
-    header: true,
-    complete: ({ data }) => {
-        // Filtrer kun de rækker, der har både valid latitude og longitude
-        const validData = data.filter(p => {
-            const lat = parseFloat(p.latitude);
-            const lon = parseFloat(p.longitude);
-            return !isNaN(lat) && !isNaN(lon);  // Kun gyldige numeriske værdier
+            download: true,
+            header: true,
+            complete: ({ data }) => {
+                const validData = data.filter(p => {
+                    const lat = parseFloat(p.latitude);
+                    const lon = parseFloat(p.longitude);
+                    return !isNaN(lat) && !isNaN(lon);  // Kun gyldige numeriske værdier
+                });
+
+                if (validData.length === 0) {
+                    console.error("Der er ingen gyldige data med lat/long.");
+                } else {
+                    allData = validData;
+                    populateDropdown(validData);
+                    addMarkers(validData);
+                }
+            },
+            error: e => console.error("Fejl ved indlæsning af CSV:", e)
         });
-
-        if (validData.length === 0) {
-            console.error("Der er ingen gyldige data med lat/long.");
-        } else {
-            allData = validData;
-            populateDropdown(validData);
-            addMarkers(validData);
-        }
-    },
-    error: e => console.error("Fejl ved indlæsning af CSV:", e)
-});
-
-
-
-
-
-
-
-
 
         // Fyld dropdown-menuen med kategorier
         function populateDropdown(data) {
@@ -179,23 +187,19 @@
                 // Jitter-effekt for markørernes placering
                 let jitterLat = lat;
                 let jitterLng = lng;
-                const jitterAmount = 0.035; // Justér jitter-størrelsen
-                
-                // Hvis der er mere end 10 personer på samme koordinat, anvend større jitter-effekt
+                const jitterAmount = 0.035;
+
                 const coordinateKey = `${lat},${lng}`;
 
                 if (coordinateCounts[coordinateKey] > 10) {
-                jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
-                jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
+                    jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
+                    jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
                 } else if (coordinateCounts[coordinateKey] > 1) {
-    
-                // Hvis der er mindre end 10 personer, anvend en lille jitter-effekt
-                const smallJitterAmount = 0.01; // Justér denne værdi for at lave en mindre jitter
-                jitterLat += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
-                jitterLng += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
-                 }
+                    const smallJitterAmount = 0.01;
+                    jitterLat += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
+                    jitterLng += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
+                }
 
-                // Opret markør med personens navn som HTML
                 var icon = L.divIcon({
                     className: 'person-name',
                     html: "<strong>" + person.personLabel + "</strong>",
@@ -205,67 +209,66 @@
                 });
 
                 var marker = L.marker([jitterLat, jitterLng], { icon: icon });
-                marker.bindPopup(
+
+                let popupContent = 
                     `<strong>${person.personLabel}</strong><br>` +
                     `Fødested: ${person.birthPlaceLabel || 'Ikke angivet'}<br>` +
                     `Profession: ${person.allProfessions || 'Ikke angivet'}<br>` +
                     `Født: ${person.birthDate || 'Ikke angivet'}<br>` +
-                    (person.deathDate && person.deathDate !== 'NA' ? `Død: ${person.deathDate}<br>` : "") +
-                    `<a href='${person.wikilink}' target='_blank'>Wikipedia</a>`
-                );
+                    (person.deathDate && person.deathDate !== 'NA' ? `Død: ${person.deathDate}<br>` : "");
 
-                markers.addLayer(marker); // Tilføj markøren til kortet
+                if (person.wiki_status === 'Eksisterer' && person.wikilink) {
+                    popupContent += `<a href='${person.wikilink}' target='_blank'>Wikipedia</a>`;
+                }
+
+                marker.bindPopup(popupContent);
+
+                markers.addLayer(marker);
             });
 
-            map.addLayer(markers); // Tilføj alle markører til kortet
+            map.addLayer(markers);
         }
 
-        // Håndter ændringer i dropdown-menuen (kategori-filter)
-        document.getElementById("category-filter").addEventListener("change", function() {
-            var selectedCategory = this.value;
-            var selectedYear = parseInt(document.getElementById("year-slider").value);
-            var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+    
+       // Opdater markørerne baseret på filter og søgning
+function updateMarkers() {
+    var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+    var selectedCategory = document.getElementById("category-filter").value;
+    var yearAfter = parseInt(document.getElementById("born-after").value);
+    var yearBefore = parseInt(document.getElementById("born-before").value);
 
-            var filteredData = allData.filter(person => {
-                var personYear = parseInt(person.year);
-                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
-                return (selectedCategory ? person.kategori === selectedCategory : true) &&
-                    personYear <= selectedYear && matchesSearch;
-            });
-            addMarkers(filteredData);
-        });
+    // Ryd eksisterende markører før opdatering
+    markers.clearLayers();
 
-        // Håndter ændringer i slideren (årstal)
-        document.getElementById("year-slider").addEventListener("input", function() {
-            var selectedYear = this.value;
-            document.getElementById("year-label").textContent = selectedYear;
+    var filteredData = allData.filter(person => {
+        var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
+        var matchesCategory = selectedCategory ? person.kategori === selectedCategory : true;
 
-            var selectedCategory = document.getElementById("category-filter").value;
-            var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+        // Filtrer efter fødselsår
+        var matchesYear = true;
+        if (!isNaN(yearAfter) && person.year) {
+            var year = parseInt(person.year.split("-")[0]);
+            matchesYear = year >= yearAfter;
+        }
+        if (!isNaN(yearBefore) && person.year) {
+            var year = parseInt(person.year.split("-")[0]);
+            matchesYear = matchesYear && year <= yearBefore;
+        }
 
-            var filteredData = allData.filter(person => {
-                var personYear = parseInt(person.year);
-                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
-                return (selectedCategory ? person.kategori === selectedCategory : true) &&
-                    personYear <= selectedYear && matchesSearch;
-            });
-            addMarkers(filteredData);
-        });
+        return matchesSearch && matchesCategory && matchesYear;
+    });
 
-        // Håndter live-søgning
-        document.getElementById("search-input").addEventListener("input", function() {
-            var selectedSearchTerm = this.value.toLowerCase();
-            var selectedYear = parseInt(document.getElementById("year-slider").value);
-            var selectedCategory = document.getElementById("category-filter").value;
+    // Tilføj de filtrerede markører
+    addMarkers(filteredData); // Opdater markørerne
+}
 
-            var filteredData = allData.filter(person => {
-                var personYear = parseInt(person.year);
-                var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
-                return (selectedCategory ? person.kategori === selectedCategory : true) &&
-                    personYear <= selectedYear && matchesSearch;
-            });
-            addMarkers(filteredData);
-        });
+// Opdater markørerne ved ændringer
+document.getElementById("search-input").addEventListener("input", updateMarkers);
+document.getElementById("category-filter").addEventListener("change", updateMarkers);
+document.getElementById("born-after").addEventListener("input", updateMarkers);
+document.getElementById("born-before").addEventListener("input", updateMarkers);
+
+
     </script>
 </body>
 </html>
