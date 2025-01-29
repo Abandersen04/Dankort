@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Kort over danske kirker</title>
+
+    <!-- Links til nødvendige eksterne biblioteker -->
+    <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+    <style>
+        /* Generelle stilarter */
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* Info-boks stil */
+        #info-text {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.79);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+            z-index: 1000;
+            max-width: 250px;
+        }
+
+        #info-text p {
+            margin: 0 0 5px;
+        }
+
+        #info-text p:first-child {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        #info-text a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        #info-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Styling for dropdown */
+        #search-input, #opført_tal-after, #opført_tal-before {
+            width: 100%;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+    /* Fjern spinnerne fra number input */
+         input[type="number"]::-webkit-outer-spin-button,
+         input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+         }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+         }
+
+    </style>
+</head>
+<body>
+    <div id="map"></div> <!-- Kortet -->
+
+    <div id="info-text">
+        <p>Det danske Kirkekort</p>
+        <p></p>
+        <p>Data: <a href="https://www.wikidata.org/wiki/Wikidata:Main_Page" target="_blank">Wikidata</a> og <a href="https://www.wikipedia.org/" target="_blank">Wikipedia</a></p>
+
+        <!-- Felter til at filtrere efter fødselsår -->
+        <div style="display: flex; justify-content: space-between; gap: 10px;">
+        <div style="flex: 1;">
+        <label for="Opført-after">Opført efter:</label>
+        <input type="number" id="Opført-after" placeholder="Opført i" style="width: 100%; max-width: 150px;">
+        </div>
+        <div style="flex: 1;">
+        <label for="Opført-before">Opført før:</label>
+        <input type="number" id="Opført-before" placeholder="Opført i" style="width: 100%; max-width: 150px;">
+        </div>
+    </div>
+
+        <!-- Søgefelt for live søgning -->
+        <label for="search-input"></label>
+        <input type="text" id="search-input" placeholder="Søg efter navn">
+    </div>
+
+    <script>
+        // Initialiser kortet
+        var map = L.map('map').setView([56.2639, 9.5018], 7);  // Sætter kortets initiale visning
+
+        // Tile layer for OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Marker Cluster for effektiv håndtering af markører
+        var markers = L.markerClusterGroup({
+            maxClusterRadius: 20
+        });
+
+        var allData = []; // Her gemmes alle data, som læses fra CSV-filen
+
+        // Indlæs data fra CSV
+        Papa.parse("kirkedata.csv", {
+            download: true,
+            header: true,
+            complete: ({ data }) => {
+                const validData = data.filter(p => {
+                    const lat = parseFloat(p.latitude);
+                    const lon = parseFloat(p.longitude);
+                    return !isNaN(lat) && !isNaN(lon);  // Kun gyldige numeriske værdier
+                });
+
+                if (validData.length === 0) {
+                    console.error("Der er ingen gyldige data med lat/long.");
+                } else {
+                    allData = validData;
+                    addMarkers(validData);
+                }
+            },
+            error: e => console.error("Fejl ved indlæsning af CSV:", e)
+        });
+
+        // Tilføj markører til kortet
+        function addMarkers(data) {
+            markers.clearLayers(); // Ryd eksisterende markører
+
+            const coordinateCounts = {}; // Tælling af churchLabeler pr. koordinat
+            data.forEach(churchLabel => {
+                const key = `${churchLabel.latitude},${churchLabel.longitude}`;
+                coordinateCounts[key] = (coordinateCounts[key] || 0) + 1;
+            });
+
+            data.forEach(churchLabel => {
+                var lat = parseFloat(churchLabel.latitude);
+                var lng = parseFloat(churchLabel.longitude);
+
+                var icon = L.divIcon({
+                    className: 'churchLabel-name',
+                    html: "<strong>" + churchLabel.churchLabel + "</strong>",
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                    popupAnchor: [0, -15]
+                });
+
+                var marker = L.marker([lat, lng], { icon: icon });
+
+                let popupContent = 
+                `<strong> ${churchLabel.churchLabel}</strong><br>` +
+                `Sogn: ${churchLabel.sogn || 'Ikke angivet'}<br>` +
+                `Stift: ${churchLabel.stift || 'Ikke angivet'}<br>` +
+                `Opført: ${churchLabel.opført || 'Ikke angivet'}<br>`;
+
+                if (churchLabel.wikilink) {
+                    popupContent += `<a href='${churchLabel.wikilink}' target='_blank'>Læs mere</a>`;
+                }
+
+                marker.bindPopup(popupContent);
+
+                markers.addLayer(marker);
+            });
+
+            map.addLayer(markers);
+        }
+
+        // Opdater markørerne baseret på søgning og fødselsår
+        function updateMarkers() {
+            var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+            var opført_talAfter = parseInt(document.getElementById("Opført-after").value);
+            var opført_talBefore = parseInt(document.getElementById("Opført-before").value);
+
+            // Ryd eksisterende markører før opdatering
+            markers.clearLayers();
+
+            var filteredData = allData.filter(churchLabel => {
+                var matchesSearch = churchLabel.churchLabel.toLowerCase().includes(selectedSearchTerm);
+
+                // Filtrer efter fødselsår
+                var matchesopført_tal = true;
+                if (!isNaN(opført_talAfter) && churchLabel.opført_tal) {
+                    var opført_tal = parseInt(churchLabel.opført_tal.split("-")[0]);
+                    matchesopført_tal = opført_tal >= opført_talAfter;
+                }
+                if (!isNaN(opført_talBefore) && churchLabel.opført_tal) {
+                    var opført_tal = parseInt(churchLabel.opført_tal.split("-")[0]);
+                    matchesopført_tal = matchesopført_tal && opført_tal <= opført_talBefore;
+                }
+
+                return matchesSearch && matchesopført_tal;
+            });
+
+            // Tilføj de filtrerede markører
+            addMarkers(filteredData); // Opdater markørerne
+        }
+
+        // Opdater markørerne ved ændringer
+        document.getElementById("search-input").addEventListener("input", updateMarkers);
+        document.getElementById("Opført-after").addEventListener("input", updateMarkers);
+        document.getElementById("Opført-before").addEventListener("input", updateMarkers);
+    </script>
+</body>
+</html>

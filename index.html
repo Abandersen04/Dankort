@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Få et kort overblik</title>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            background-color: #fafafa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #333;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            width: 100%;
+            padding: 20px 20px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        header img {
+            width: 125px;
+            height: auto;
+            margin-right: 30px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 3.5em;
+            letter-spacing: 1px;
+        }
+        .content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            margin-top: 120px; /* Adjusted to make room for the header */
+            flex-wrap: wrap;
+        }
+        .card {
+            width: 350px;
+            height: 500px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.3s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-10px);
+        }
+        .card img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            filter: brightness(70%);
+            transition: transform 0.3s ease;
+        }
+        .card img:hover {
+            transform: scale(1.1);
+        }
+        .card-body {
+            padding: 30px;
+            text-align: center;
+        }
+        .card-body h2 {
+            margin: 20px 0;
+            color: #2980b9;
+            font-size: 2.2em;
+            font-weight: bold;
+        }
+        .card-body p {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+        }
+        .button-container a {
+            text-decoration: none;
+            background-color: #3498db;
+            color: white;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+        .button-container a:hover {
+            background-color: #2980b9;
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Kommuner_Danmark_Blankt_Kort.svg/799px-Kommuner_Danmark_Blankt_Kort.svg.png?20231102221146" alt="f Logo">
+    <h1>Et kort overblik</h1>
+</header>
+
+<div class="content">
+    <!-- Kirker Card -->
+    <div class="card">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Sahl_Kirke_%28Holstebro_Kommune%29.jpg/1920px-Sahl_Kirke_%28Holstebro_Kommune%29.jpg" alt="Dansk Kirke">
+        <div class="card-body">
+            <h2>Danske Kirker</h2>
+            <p>Udforsk kortet over mere end 2500 danske kirker.</p>
+            <div class="button-container">
+                <a href="kirker.html" target="_blank">Åbn Kortet</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kendt Dansker Card -->
+    <div class="card">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Niels_Bohr.jpg/1024px-Niels_Bohr.jpg" alt="Kendt Dansker">
+        <div class="card-body">
+            <h2>Danske Personer</h2>
+            <p>Udforsk kortet over fødselssted for mere end 25000 danskere.</p>
+            <div class="button-container">
+                <a href="people.html" target="_blank">Åbn Kortet</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
