@@ -42,7 +42,7 @@
         .top-bar-new p {
             margin: 0;
             font-size: 14px;
-            color: #000000;
+            color: #333;
         }
 
         /* Original bar */
@@ -86,7 +86,7 @@
         }
 
         /* Gør dropdown-menuen mere kompakt */
-        #search-input, #born-after, #born-before {
+        #search-input, #Byggeår-after, #Byggeår-before {
             width: 110px; /* Smallere boks */
             padding: 5px;
             border-radius: 20px;
@@ -106,24 +106,26 @@
 
     </style>
 </head>
-<body>
-    <div id="map"></div> <!-- Kortet -->
 
+<body>
+
+    <!-- Ny bar med information og tilbageknap -->
     <div class="top-bar-new">
         <a id="back-button" href="index.html">Hovedmenu</a>  <!-- tilbageknap -->
-        <p>Placeringerne vises kun på sogne- og områdeniveau.<br>Data: <a href="https://www.wikidata.org/wiki/Wikidata:Main_Page" target="_blank">Wikidata</a></p>
+        <p><strong><span style="font-size: 20px;">Danske stationer</span></strong><br>Alt information og data er fra <a href="https://danskejernbaner.dk/" target="_blank">danskejernbaner.dk</a>, der ejes, udvikles og drives af Dansk Jernbanehistorisk Arkiv</p>
+    </div>
+
+    <!-- Original bar -->
+    <div class="top-bar">
+        <input type="text" id="search-input" placeholder="Søg efter navn" />
+        <input type="number" id="Byggeår-after" placeholder="Bygget efter">
+        <input type="number" id="Byggeår-before" placeholder="Bygget før">
+        <select id="category-filter">
+            <option value="">Vælg arkitekt</option>
         </select>
+    </div>
 
-        <!-- Felter til at filtrere efter fødselsår -->
-        <div class="top-bar">
-            <input type="text" id="search-input" placeholder="Søg efter navn" />
-            <input type="number" id="born-after" placeholder="Født efter">
-            <input type="number" id="born-before" placeholder="Født før">
-            <select id="category-filter">
-                <option value="">Vælg profession</option>
-            </select>
-        </div>
-
+    <div id="map"></div> <!-- Kortet -->
 
     <script>
         // Initialiser kortet
@@ -132,32 +134,27 @@
             zoom: 6,  // Ændr zoomniveau
             zoomControl: false  // Deaktiver standard zoom-knap
         });
-
         // Tile layer for OpenStreetMap
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd'
-}).addTo(map);
-
-
-
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
         // Zoom-knap i højre nederste hjørne
         L.control.zoom({
-                    position: 'bottomright' 
-                    
-                }).addTo(map);
-
+            position: 'bottomright' 
+            
+        }).addTo(map);
 
         // Marker Cluster for effektiv håndtering af markører
         var markers = L.markerClusterGroup({
-            maxClusterRadius: 32
-        });
+    disableClusteringAtZoom: 1 // Slår clustering fra ved zoom 10+
+});
+
 
         var allData = []; // Her gemmes alle data, som læses fra CSV-filen
 
         // Indlæs data fra CSV
-        Papa.parse("data1.csv", {
+        Papa.parse("stationdata.csv", {
             download: true,
             header: true,
             complete: ({ data }) => {
@@ -178,9 +175,9 @@
             error: e => console.error("Fejl ved indlæsning af CSV:", e)
         });
 
-        // Fyld dropdown-menuen med kategorier
+        // Fyld dropdown-menuen med arkitekt
         function populateDropdown(data) {
-            var categories = [...new Set(data.map(person => person.kategori))]; // Hent unikke kategorier
+            var categories = [...new Set(data.map(station => station.Arkitekt))]; // Hent unikke kategorier
             var categoryFilter = document.getElementById("category-filter");
 
             categories.sort().forEach(category => {
@@ -195,88 +192,98 @@
         function addMarkers(data) {
             markers.clearLayers(); // Ryd eksisterende markører
 
-            const coordinateCounts = {}; // Tælling af personer pr. koordinat
-            data.forEach(person => {
-                const key = `${person.latitude},${person.longitude}`;
+            const coordinateCounts = {}; // Tælling af stationer pr. koordinat
+            data.forEach(station => {
+                const key = `${station.latitude},${station.longitude}`;
                 coordinateCounts[key] = (coordinateCounts[key] || 0) + 1;
             });
 
-            data.forEach(person => {
-                var lat = parseFloat(person.latitude);
-                var lng = parseFloat(person.longitude);
+            data.forEach(station => {
+                var lat = parseFloat(station.latitude);
+                var lng = parseFloat(station.longitude);
 
-                // Jitter-effekt for markørernes placering
-                let jitterLat = lat;
-                let jitterLng = lng;
-                const jitterAmount = 0.035;
+                // Fjern jitter-effekten og brug de oprindelige koordinater
+                var jitterLat = lat;
+                var jitterLng = lng;
 
-                const coordinateKey = `${lat},${lng}`;
-
-                if (coordinateCounts[coordinateKey] > 10) {
-                    jitterLat += (Math.random() * jitterAmount - jitterAmount / 2);
-                    jitterLng += (Math.random() * jitterAmount - jitterAmount / 2);
-                } else if (coordinateCounts[coordinateKey] > 1) {
-                    const smallJitterAmount = 0.01;
-                    jitterLat += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
-                    jitterLng += (Math.random() * smallJitterAmount - smallJitterAmount / 2);
-                }
-
-                var icon = L.divIcon({
-                    className: 'person-name',
-                    html: "<strong>" + person.personLabel + "</strong>",
-                    iconSize: [30, 30],
+                var icon = L.icon({
+                    iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Station-stub_logo.png',
+                    iconSize: [25, 25],
                     iconAnchor: [15, 15],
                     popupAnchor: [0, -15]
                 });
 
                 var marker = L.marker([jitterLat, jitterLng], { icon: icon });
 
-                let popupContent = 
-                    `<strong>${person.personLabel}</strong><br>` +
-                    `Fødested: ${person.birthPlaceLabel || 'Ikke angivet'}<br>` +
-                    `Profession: ${person.allProfessions || 'Ikke angivet'}<br>` +
-                    `Født: ${person.birthDate || 'Ikke angivet'}<br>` +
-                    (person.deathDate && person.deathDate !== 'NA' ? `Død: ${person.deathDate}<br>` : "");
+               
+        let popupContent = 
+            `<strong>${station.navn}</strong><br>` +
+            `Byggår: ${station.Byggeår || 'Ikke angivet'}<br>`;
 
-                if (person.wiki_status === 'Eksisterer' && person.wikilink) {
-                    popupContent += `<a href='${person.wikilink}' target='_blank'>Wikipedia</a>`;
+                function isValidDate(date) {
+                    return !isNaN(new Date(date).getTime());
                 }
 
-                marker.bindPopup(popupContent);
+                if (isValidDate(station.Åbent) || !isNaN(station.Åbent)) {
+                    popupContent += `Åbning: ${station.Åbent}<br>`;
+                } else if (station.Åbent) {
+                    popupContent += `${station.Åbent}<br>`;
+                }
 
-                markers.addLayer(marker);
-            });
+                if (isValidDate(station.Nedlagt) || !isNaN(station.Nedlagt)) {
+                    popupContent += `Nedlagt: ${station.Nedlagt}<br>`;
+                } else if (station.Nedlagt) {
+                    popupContent += `${station.Nedlagt}<br>`;
+                }
 
-            map.addLayer(markers);
-        }
+                if (isValidDate(station.Nedrevet) || !isNaN(station.Nedrevet)) {
+                    popupContent += `Nedrevet: ${station.Nedrevet}<br>`;
+                } else if (station.Nedrevet) {
+                    popupContent += `${station.Nedrevet}<br>`;
+                }
+
+                popupContent += `Højde over havet: ${station.altitude || 'Ikke angivet'}<br>` +
+                `Arkitekt: ${station.Arkitekt || 'Ikke angivet'}<br>` +
+                                `<a href='${station.Link}' target='_blank'>Læs mere</a><br>`;
+
+
+
+        marker.bindPopup(popupContent);
+
+        markers.addLayer(marker);
+    });
+
+    map.addLayer(markers);
+}
+
 
     
-       // Opdater markørerne baseret på filter og søgning
-function updateMarkers() {
-    var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
-    var selectedCategory = document.getElementById("category-filter").value;
-    var yearAfter = parseInt(document.getElementById("born-after").value);
-    var yearBefore = parseInt(document.getElementById("born-before").value);
+    // Opdater markørerne baseret på filter og søgning
+        function updateMarkers() {
+        var selectedSearchTerm = document.getElementById("search-input").value.toLowerCase();
+        var selectedCategory = document.getElementById("category-filter").value;
+        var ByggeårAfter = parseInt(document.getElementById("Byggeår-after").value);
+        var ByggeårBefore = parseInt(document.getElementById("Byggeår-before").value);
 
     // Ryd eksisterende markører før opdatering
-    markers.clearLayers();
+         markers.clearLayers();
 
-    var filteredData = allData.filter(person => {
-        var matchesSearch = person.personLabel.toLowerCase().includes(selectedSearchTerm);
-        var matchesCategory = selectedCategory ? person.kategori === selectedCategory : true;
+    var filteredData = allData.filter(station => {
+        var matchesSearch = station.navn.toLowerCase().includes(selectedSearchTerm);
+        var matchesCategory = selectedCategory ? station.Arkitekt === selectedCategory : true;
 
-        // Filtrer efter fødselsår
-        var matchesYear = true;
-        if (!isNaN(yearAfter) && person.year) {
-            var year = parseInt(person.year.split("-")[0]);
-            matchesYear = year >= yearAfter;
+        // Filtrer efter byggeår
+        var matchesByggeår = true;
+        if (!isNaN(ByggeårAfter) && station.Byggeår) {
+            var Byggeår = parseInt(station.Byggeår.split("-")[0]);
+            matchesByggeår = Byggeår >= ByggeårAfter;
         }
-        if (!isNaN(yearBefore) && person.year) {
-            var year = parseInt(person.year.split("-")[0]);
-            matchesYear = matchesYear && year <= yearBefore;
+        if (!isNaN(ByggeårBefore) && station.Byggeår) {
+            var Byggeår = parseInt(station.Byggeår.split("-")[0]);
+            matchesByggeår = matchesByggeår && Byggeår <= ByggeårBefore;
         }
 
-        return matchesSearch && matchesCategory && matchesYear;
+        return matchesSearch && matchesCategory && matchesByggeår;
     });
 
     // Tilføj de filtrerede markører
@@ -286,8 +293,8 @@ function updateMarkers() {
 // Opdater markørerne ved ændringer
 document.getElementById("search-input").addEventListener("input", updateMarkers);
 document.getElementById("category-filter").addEventListener("change", updateMarkers);
-document.getElementById("born-after").addEventListener("input", updateMarkers);
-document.getElementById("born-before").addEventListener("input", updateMarkers);
+document.getElementById("Byggeår-after").addEventListener("input", updateMarkers);
+document.getElementById("Byggeår-before").addEventListener("input", updateMarkers);
 
 
     </script>
